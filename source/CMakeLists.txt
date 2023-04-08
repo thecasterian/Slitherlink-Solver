@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 set(TARGET slitherlink)
-set(SRCS slitherlink.cpp)
+set(SRCS slitherlink.cpp main.cpp)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR})
 
 set(CMAKE_CXX_STANDARD 17)
