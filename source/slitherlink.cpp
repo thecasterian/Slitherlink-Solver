@@ -64,31 +64,25 @@ public:
     }
 
     void print_solution_pretty(void) {
-        std::vector<std::string> buf(2 * this->nr + 5, std::string(4 * this->nc + 5, ' '));
-        for (int i = 0; i < 2 * this->nr + 5; ++i) {
-            buf[i][0] = buf[i][4 * this->nc + 4] = '#';
-        }
-        for (int j = 0; j < 4 * this->nc + 5; ++j) {
-            buf[0][j] = buf[2 * this->nr + 4][j] = '#';
-        }
+        std::vector<std::string> buf(2 * this->nr + 3, std::string(4 * this->nc + 5, ' '));
 
         for (int i = 1; i < this->nr + 1; ++i) {
             for (int j = 1; j < this->nc + 1; ++j) {
-                buf[2 * i + 1][4 * j] = this->grid[i][j] != -1 ? this->grid[i][j] + '0' : ' ';
+                buf[2 * i][4 * j] = this->grid[i][j] != -1 ? this->grid[i][j] + '0' : ' ';
             }
         }
 
         for (int i = 0; i < this->nr + 1; ++i) {
             for (int j = 1; j < this->nc + 1; ++j) {
                 if (IS_DIFF(this->region_solved[i][j], this->region_solved[i + 1][j])) {
-                    buf[2 * i + 2][4 * j - 1] = buf[2 * i + 2][4 * j] = buf[2 * i + 2][4 * j + 1] = '-';
+                    buf[2 * i + 1][4 * j - 1] = buf[2 * i + 1][4 * j] = buf[2 * i + 1][4 * j + 1] = '-';
                 }
             }
         }
         for (int i = 1; i < this->nr + 1; ++i) {
             for (int j = 0; j < this->nc + 1; ++j) {
                 if (IS_DIFF(this->region_solved[i][j], this->region_solved[i][j + 1])) {
-                    buf[2 * i + 1][4 * j + 2] = '|';
+                    buf[2 * i][4 * j + 2] = '|';
                 }
             }
         }
@@ -96,30 +90,32 @@ public:
         for (int i = 0; i < this->nr + 1; ++i) {
             for (int j = 0; j < this->nc + 1; ++j) {
                 int cnt_h = 0, cnt_v = 0;
-                if (buf[2 * i + 2][4 * j + 1] == '-') {
+                if (buf[2 * i + 1][4 * j + 1] == '-') {
                     ++cnt_h;
                 }
-                if (buf[2 * i + 2][4 * j + 3] == '-') {
+                if (buf[2 * i + 1][4 * j + 3] == '-') {
                     ++cnt_h;
                 }
-                if (buf[2 * i + 1][4 * j + 2] == '|') {
+                if (buf[2 * i][4 * j + 2] == '|') {
                     ++cnt_v;
                 }
-                if (buf[2 * i + 3][4 * j + 2] == '|') {
+                if (buf[2 * i + 2][4 * j + 2] == '|') {
                     ++cnt_v;
                 }
 
                 if (cnt_h == 2) {
-                    buf[2 * i + 2][4 * j + 2] = '-';
+                    buf[2 * i + 1][4 * j + 2] = '-';
                 } else if (cnt_v == 2) {
-                    buf[2 * i + 2][4 * j + 2] = '|';
+                    buf[2 * i + 1][4 * j + 2] = '|';
                 } else if (cnt_h == 1 && cnt_v == 1) {
-                    buf[2 * i + 2][4 * j + 2] = '+';
+                    buf[2 * i + 1][4 * j + 2] = '+';
+                } else {
+                    buf[2 * i + 1][4 * j + 2] = '.';
                 }
             }
         }
 
-        for (int i = 0; i < 2 * this->nr + 5; ++i) {
+        for (int i = 0; i < 2 * this->nr + 3; ++i) {
             std::cout << buf[i] << '\n';
         }
     }
