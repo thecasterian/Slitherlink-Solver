@@ -9,32 +9,35 @@ using namespace slink;
 #define FOR_CELL                           \
     for (int i = 1; i < this->nr + 1; ++i) \
         for (int j = 1; j < this->nc + 1; ++j)
+
 #define FOR_ADJ                 \
     for (int k = 0; k < 4; k++) \
         if (0 <= i + adj[k][0] && i + adj[k][0] < this->nr + 2 && 0 <= j + adj[k][1] && j + adj[k][1] < this->nc + 2)
+
 #define ADJ_REG (region[i + adj[k][0]][j + adj[k][1]])
-#define INV(r) ((r) == Region::UNDET ? Region::UNDET : ((r) == Region::INNER ? Region::OUTER : Region::INNER))
-#define IS_SAME(r1, r2) \
-    (((r1) == Region::INNER && (r2) == Region::INNER) || ((r1) == Region::OUTER && (r2) == Region::OUTER))
-#define IS_DIFF(r1, r2) \
-    (((r1) == Region::INNER && (r2) == Region::OUTER) || ((r1) == Region::OUTER && (r2) == Region::INNER))
-#define UPDATE(r, nr)                                        \
-    do {                                                     \
-        if (IS_DIFF(r, nr)) {                                \
-            return false;                                    \
-        }                                                    \
-        if ((r) == Region::UNDET && (nr) != Region::UNDET) { \
-            (r) = (nr);                                      \
-            changed = true;                                  \
-        }                                                    \
+
+#define UPDATE(r, nr)                          \
+    do {                                       \
+        bool _updated;                         \
+        if (!update_region(r, nr, _updated)) { \
+            return false;                      \
+        }                                      \
+        if (_updated) {                        \
+            changed = true;                    \
+        }                                      \
     } while (0)
 
-constexpr int adj[4][2] = {
+static constexpr int adj[4][2] = {
     {-1, 0},
     {0, 1},
     {1, 0},
     {0, -1},
 };
+
+static Region inv_region(Region r);
+static bool is_same_region(Region r1, Region r2);
+static bool is_diff_region(Region r1, Region r2);
+static bool update_region(Region &r, Region nr, bool &updated);
 
 Slitherlink::Slitherlink(const std::vector<std::vector<int>> &grid)
     : nr(grid.size()), nc(grid[0].size()), grid(nr + 2, std::vector<Number>(nc + 2, Number::EMPTY)) {
@@ -73,14 +76,14 @@ void Slitherlink::print_solution(void) {
 
     for (int i = 0; i < this->nr + 1; ++i) {
         for (int j = 1; j < this->nc + 1; ++j) {
-            if (IS_DIFF(this->region_solved[i][j], this->region_solved[i + 1][j])) {
+            if (is_diff_region(this->region_solved[i][j], this->region_solved[i + 1][j])) {
                 buf[2 * i + 1][4 * j - 1] = buf[2 * i + 1][4 * j] = buf[2 * i + 1][4 * j + 1] = '-';
             }
         }
     }
     for (int i = 1; i < this->nr + 1; ++i) {
         for (int j = 0; j < this->nc + 1; ++j) {
-            if (IS_DIFF(this->region_solved[i][j], this->region_solved[i][j + 1])) {
+            if (is_diff_region(this->region_solved[i][j], this->region_solved[i][j + 1])) {
                 buf[2 * i][4 * j + 2] = '|';
             }
         }
@@ -174,7 +177,7 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<Region>> &region) {
                     other adjacent regions must have the same region. */
                 int cnt = 0;
                 FOR_ADJ {
-                    if (IS_DIFF(ADJ_REG, region[i][j])) {
+                    if (is_diff_region(ADJ_REG, region[i][j])) {
                         ++cnt;
                     }
                 }
@@ -192,14 +195,14 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<Region>> &region) {
                     other adjacent regions must have the different region. */
                 cnt = 0;
                 FOR_ADJ {
-                    if (IS_SAME(ADJ_REG, region[i][j])) {
+                    if (is_same_region(ADJ_REG, region[i][j])) {
                         ++cnt;
                     }
                 }
                 if (cnt == 4 - static_cast<int>(this->grid[i][j])) {
                     FOR_ADJ {
                         if (ADJ_REG == Region::UNDET) {
-                            UPDATE(ADJ_REG, INV(region[i][j]));
+                            UPDATE(ADJ_REG, inv_region(region[i][j]));
                         }
                     }
                 } else if (cnt > 4 - static_cast<int>(this->grid[i][j])) {
@@ -209,108 +212,106 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<Region>> &region) {
 
             /* When two 3's are adjacent. */
             if (this->grid[i][j] == Number::THREE && this->grid[i][j + 1] == Number::THREE &&
-                (IS_SAME(region[i][j - 1], region[i][j + 1]) || IS_DIFF(region[i][j], region[i][j + 1]) ||
-                 IS_SAME(region[i][j], region[i][j + 2]))) {
-                UPDATE(region[i][j - 1], INV(region[i][j]));
+                (is_same_region(region[i][j - 1], region[i][j + 1]) || is_diff_region(region[i][j], region[i][j + 1]) ||
+                 is_same_region(region[i][j], region[i][j + 2]))) {
+                UPDATE(region[i][j - 1], inv_region(region[i][j]));
                 UPDATE(region[i][j - 1], region[i][j + 1]);
-                UPDATE(region[i][j - 1], INV(region[i][j + 2]));
+                UPDATE(region[i][j - 1], inv_region(region[i][j + 2]));
 
-                UPDATE(region[i][j], INV(region[i][j - 1]));
-                UPDATE(region[i][j], INV(region[i][j + 1]));
+                UPDATE(region[i][j], inv_region(region[i][j - 1]));
+                UPDATE(region[i][j], inv_region(region[i][j + 1]));
                 UPDATE(region[i][j], region[i][j + 2]);
 
                 UPDATE(region[i][j + 1], region[i][j - 1]);
-                UPDATE(region[i][j + 1], INV(region[i][j]));
-                UPDATE(region[i][j + 1], INV(region[i][j + 2]));
+                UPDATE(region[i][j + 1], inv_region(region[i][j]));
+                UPDATE(region[i][j + 1], inv_region(region[i][j + 2]));
 
-                UPDATE(region[i][j + 2], INV(region[i][j - 1]));
+                UPDATE(region[i][j + 2], inv_region(region[i][j - 1]));
                 UPDATE(region[i][j + 2], region[i][j]);
-                UPDATE(region[i][j + 2], INV(region[i][j + 1]));
+                UPDATE(region[i][j + 2], inv_region(region[i][j + 1]));
             }
             if (this->grid[i][j] == Number::THREE && this->grid[i + 1][j] == Number::THREE &&
-                (IS_SAME(region[i - 1][j], region[i + 1][j]) || IS_DIFF(region[i][j], region[i + 1][j]) ||
-                 IS_SAME(region[i][j], region[i + 2][j]))) {
-                UPDATE(region[i - 1][j], INV(region[i][j]));
+                (is_same_region(region[i - 1][j], region[i + 1][j]) || is_diff_region(region[i][j], region[i + 1][j]) ||
+                 is_same_region(region[i][j], region[i + 2][j]))) {
+                UPDATE(region[i - 1][j], inv_region(region[i][j]));
                 UPDATE(region[i - 1][j], region[i + 1][j]);
-                UPDATE(region[i - 1][j], INV(region[i + 2][j]));
+                UPDATE(region[i - 1][j], inv_region(region[i + 2][j]));
 
-                UPDATE(region[i][j], INV(region[i - 1][j]));
-                UPDATE(region[i][j], INV(region[i + 1][j]));
+                UPDATE(region[i][j], inv_region(region[i - 1][j]));
+                UPDATE(region[i][j], inv_region(region[i + 1][j]));
                 UPDATE(region[i][j], region[i + 2][j]);
 
                 UPDATE(region[i + 1][j], region[i - 1][j]);
-                UPDATE(region[i + 1][j], INV(region[i][j]));
-                UPDATE(region[i + 1][j], INV(region[i + 2][j]));
+                UPDATE(region[i + 1][j], inv_region(region[i][j]));
+                UPDATE(region[i + 1][j], inv_region(region[i + 2][j]));
 
-                UPDATE(region[i + 2][j], INV(region[i - 1][j]));
+                UPDATE(region[i + 2][j], inv_region(region[i - 1][j]));
                 UPDATE(region[i + 2][j], region[i][j]);
-                UPDATE(region[i + 2][j], INV(region[i + 1][j]));
+                UPDATE(region[i + 2][j], inv_region(region[i + 1][j]));
             }
 
             /* When two 3's are diagonally adjacent. */
             if (this->grid[i][j] == Number::THREE && this->grid[i + 1][j + 1] == Number::THREE) {
-                UPDATE(region[i][j], INV(region[i - 1][j]));
-                UPDATE(region[i][j], INV(region[i][j - 1]));
-                UPDATE(region[i - 1][j], INV(region[i][j]));
-                UPDATE(region[i][j - 1], INV(region[i][j]));
+                UPDATE(region[i][j], inv_region(region[i - 1][j]));
+                UPDATE(region[i][j], inv_region(region[i][j - 1]));
+                UPDATE(region[i - 1][j], inv_region(region[i][j]));
+                UPDATE(region[i][j - 1], inv_region(region[i][j]));
 
-                UPDATE(region[i + 1][j + 1], INV(region[i + 1][j + 2]));
-                UPDATE(region[i + 1][j + 1], INV(region[i + 2][j + 1]));
-                UPDATE(region[i + 1][j + 2], INV(region[i + 1][j + 1]));
-                UPDATE(region[i + 2][j + 1], INV(region[i + 1][j + 1]));
+                UPDATE(region[i + 1][j + 1], inv_region(region[i + 1][j + 2]));
+                UPDATE(region[i + 1][j + 1], inv_region(region[i + 2][j + 1]));
+                UPDATE(region[i + 1][j + 2], inv_region(region[i + 1][j + 1]));
+                UPDATE(region[i + 2][j + 1], inv_region(region[i + 1][j + 1]));
             }
             if (this->grid[i][j] == Number::THREE && this->grid[i + 1][j - 1] == Number::THREE) {
-                UPDATE(region[i][j], INV(region[i - 1][j]));
-                UPDATE(region[i][j], INV(region[i][j + 1]));
-                UPDATE(region[i - 1][j], INV(region[i][j]));
-                UPDATE(region[i][j + 1], INV(region[i][j]));
+                UPDATE(region[i][j], inv_region(region[i - 1][j]));
+                UPDATE(region[i][j], inv_region(region[i][j + 1]));
+                UPDATE(region[i - 1][j], inv_region(region[i][j]));
+                UPDATE(region[i][j + 1], inv_region(region[i][j]));
 
-                UPDATE(region[i + 1][j - 1], INV(region[i + 1][j - 2]));
-                UPDATE(region[i + 1][j - 1], INV(region[i + 2][j - 1]));
-                UPDATE(region[i + 1][j - 2], INV(region[i + 1][j - 1]));
-                UPDATE(region[i + 2][j - 1], INV(region[i + 1][j - 1]));
+                UPDATE(region[i + 1][j - 1], inv_region(region[i + 1][j - 2]));
+                UPDATE(region[i + 1][j - 1], inv_region(region[i + 2][j - 1]));
+                UPDATE(region[i + 1][j - 2], inv_region(region[i + 1][j - 1]));
+                UPDATE(region[i + 2][j - 1], inv_region(region[i + 1][j - 1]));
             }
-        }
 
-        FOR_CELL {
             /* When two diagnoally adjacent cells with the same region have common neighbor with the same region and
                 the other common neighbor is 3, it must have the different region. */
             if (this->grid[i][j] == Number::THREE) {
-                if (IS_SAME(region[i - 1][j], region[i - 1][j + 1]) &&
-                    IS_SAME(region[i - 1][j + 1], region[i][j + 1])) {
-                    UPDATE(region[i][j], INV(region[i - 1][j]));
+                if (is_same_region(region[i - 1][j], region[i - 1][j + 1]) &&
+                    is_same_region(region[i - 1][j + 1], region[i][j + 1])) {
+                    UPDATE(region[i][j], inv_region(region[i - 1][j]));
                 }
-                if (IS_SAME(region[i][j + 1], region[i + 1][j + 1]) &&
-                    IS_SAME(region[i + 1][j + 1], region[i + 1][j])) {
-                    UPDATE(region[i][j], INV(region[i][j + 1]));
+                if (is_same_region(region[i][j + 1], region[i + 1][j + 1]) &&
+                    is_same_region(region[i + 1][j + 1], region[i + 1][j])) {
+                    UPDATE(region[i][j], inv_region(region[i][j + 1]));
                 }
-                if (IS_SAME(region[i + 1][j], region[i + 1][j - 1]) &&
-                    IS_SAME(region[i + 1][j - 1], region[i][j - 1])) {
-                    UPDATE(region[i][j], INV(region[i + 1][j]));
+                if (is_same_region(region[i + 1][j], region[i + 1][j - 1]) &&
+                    is_same_region(region[i + 1][j - 1], region[i][j - 1])) {
+                    UPDATE(region[i][j], inv_region(region[i + 1][j]));
                 }
-                if (IS_SAME(region[i][j - 1], region[i - 1][j - 1]) &&
-                    IS_SAME(region[i - 1][j - 1], region[i - 1][j])) {
-                    UPDATE(region[i][j], INV(region[i][j - 1]));
+                if (is_same_region(region[i][j - 1], region[i - 1][j - 1]) &&
+                    is_same_region(region[i - 1][j - 1], region[i - 1][j])) {
+                    UPDATE(region[i][j], inv_region(region[i][j - 1]));
                 }
             }
 
             /* When two diagnoally adjacent cells with the same region have common neighbor with the same region and
                 the other common neighbor is 1, it must have the same region. */
             if (this->grid[i][j] == Number::ONE) {
-                if (IS_SAME(region[i - 1][j], region[i - 1][j + 1]) &&
-                    IS_SAME(region[i - 1][j + 1], region[i][j + 1])) {
+                if (is_same_region(region[i - 1][j], region[i - 1][j + 1]) &&
+                    is_same_region(region[i - 1][j + 1], region[i][j + 1])) {
                     UPDATE(region[i][j], region[i - 1][j]);
                 }
-                if (IS_SAME(region[i][j + 1], region[i + 1][j + 1]) &&
-                    IS_SAME(region[i + 1][j + 1], region[i + 1][j])) {
+                if (is_same_region(region[i][j + 1], region[i + 1][j + 1]) &&
+                    is_same_region(region[i + 1][j + 1], region[i + 1][j])) {
                     UPDATE(region[i][j], region[i][j + 1]);
                 }
-                if (IS_SAME(region[i + 1][j], region[i + 1][j - 1]) &&
-                    IS_SAME(region[i + 1][j - 1], region[i][j - 1])) {
+                if (is_same_region(region[i + 1][j], region[i + 1][j - 1]) &&
+                    is_same_region(region[i + 1][j - 1], region[i][j - 1])) {
                     UPDATE(region[i][j], region[i + 1][j]);
                 }
-                if (IS_SAME(region[i][j - 1], region[i - 1][j - 1]) &&
-                    IS_SAME(region[i - 1][j - 1], region[i - 1][j])) {
+                if (is_same_region(region[i][j - 1], region[i - 1][j - 1]) &&
+                    is_same_region(region[i - 1][j - 1], region[i - 1][j])) {
                     UPDATE(region[i][j], region[i][j - 1]);
                 }
             }
@@ -369,8 +370,8 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<Region>> &region) {
 bool Slitherlink::is_available_partial_solution(std::vector<std::vector<Region>> &region) {
     /* No checkerboard pattern is allowed in 2x2 cells. */
     FOR_CELL {
-        if (IS_DIFF(region[i][j], region[i][j + 1]) && IS_DIFF(region[i][j + 1], region[i + 1][j + 1]) &&
-            IS_DIFF(region[i + 1][j + 1], region[i + 1][j])) {
+        if (is_diff_region(region[i][j], region[i][j + 1]) && is_diff_region(region[i][j + 1], region[i + 1][j + 1]) &&
+            is_diff_region(region[i + 1][j + 1], region[i + 1][j])) {
             return false;
         }
     }
@@ -493,4 +494,28 @@ void Slitherlink::print_region(const std::vector<std::vector<Region>> &region) {
         }
         std::cout << std::endl;
     }
+}
+
+static Region inv_region(Region r) {
+    return r == Region::UNDET ? Region::UNDET : (r == Region::INNER ? Region::OUTER : Region::INNER);
+}
+
+static bool is_same_region(Region r1, Region r2) {
+    return (r1 == Region::INNER && r2 == Region::INNER) || (r1 == Region::OUTER && r2 == Region::OUTER);
+}
+
+static bool is_diff_region(Region r1, Region r2) {
+    return (r1 == Region::INNER && r2 == Region::OUTER) || (r1 == Region::OUTER && r2 == Region::INNER);
+}
+
+static bool update_region(Region &r, Region nr, bool &updated) {
+    updated = false;
+    if (is_diff_region(r, nr)) {
+        return false;
+    }
+    if (r == Region::UNDET && nr != Region::UNDET) {
+        r = nr;
+        updated = true;
+    }
+    return true;
 }
