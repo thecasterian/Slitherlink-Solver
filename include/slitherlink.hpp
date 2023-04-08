@@ -7,18 +7,22 @@
 
 namespace slink {
 
-enum Region {
-    UNDET = 0xF,
-    INNER = 0x1,
-    OUTER = 0x2,
+enum class Region {
+    UNDET,
+    INNER,
+    OUTER,
 
-    UNDET_BFS = 0xF0,
-    INNER_BFS = 0x10,
-    OUTER_BFS = 0x20,
+    UNDET_BFS,
+    INNER_BFS,
+    OUTER_BFS,
 };
 
-enum Number {
+enum class Number {
     EMPTY = -1,
+    ZERO = 0,
+    ONE = 1,
+    TWO = 2,
+    THREE = 3,
 };
 
 class Slitherlink {
@@ -30,16 +34,16 @@ public:
     void print_solution(void);
 
 private:
-    bool solve_helper(const std::vector<std::vector<int>> &region);
-    bool apply_heuristics(std::vector<std::vector<int>> &region);
-    bool is_available_partial_solution(std::vector<std::vector<int>> &region);
-    bool is_answer(std::vector<std::vector<int>> &region);
-    std::pair<int, int> find_region(std::vector<std::vector<int>> &region, int val);
-    void print_region(const std::vector<std::vector<int>> &region);
+    bool solve_helper(const std::vector<std::vector<Region>> &region);
+    bool apply_heuristics(std::vector<std::vector<Region>> &region);
+    bool is_available_partial_solution(std::vector<std::vector<Region>> &region);
+    bool is_answer(std::vector<std::vector<Region>> &region);
+    std::pair<int, int> find_region(std::vector<std::vector<Region>> &region, Region val);
+    void print_region(const std::vector<std::vector<Region>> &region);
 
     const int nr, nc;
-    std::vector<std::vector<int>> grid;
-    std::vector<std::vector<int>> region_solved;
+    std::vector<std::vector<Number>> grid;
+    std::vector<std::vector<Region>> region_solved;
 };
 
 }

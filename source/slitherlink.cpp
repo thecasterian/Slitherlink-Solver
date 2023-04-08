@@ -1,50 +1,62 @@
+#include "slitherlink.hpp"
+
 #include <iostream>
 #include <queue>
 #include <utility>
-#include "slitherlink.hpp"
 
 using namespace slink;
 
-#define FOR_CELL for (int i = 1; i < this->nr + 1; ++i) for (int j = 1; j < this->nc + 1; ++j)
-#define FOR_ADJ for (int k = 0; k < 4; k++) if (0 <= i + adj[k][0] && i + adj[k][0] < this->nr + 2 && 0 <= j + adj[k][1] && j + adj[k][1] < this->nc + 2)
+#define FOR_CELL                           \
+    for (int i = 1; i < this->nr + 1; ++i) \
+        for (int j = 1; j < this->nc + 1; ++j)
+#define FOR_ADJ                 \
+    for (int k = 0; k < 4; k++) \
+        if (0 <= i + adj[k][0] && i + adj[k][0] < this->nr + 2 && 0 <= j + adj[k][1] && j + adj[k][1] < this->nc + 2)
 #define ADJ_REG (region[i + adj[k][0]][j + adj[k][1]])
-#define INV(r) ((r) == UNDET ? UNDET : ((r) == INNER ? OUTER : INNER))
-#define IS_SAME(r1, r2) (((r1) == INNER && (r2) == INNER) || ((r1) == OUTER && (r2) == OUTER))
-#define IS_DIFF(r1, r2) (((r1) == INNER && (r2) == OUTER) || ((r1) == OUTER && (r2) == INNER))
-#define UPDATE(r, nr) do { if (IS_DIFF(r, nr)) { return false; } if ((r) == UNDET && (nr) != UNDET) { (r) = (nr); changed = true; } } while (0)
+#define INV(r) ((r) == Region::UNDET ? Region::UNDET : ((r) == Region::INNER ? Region::OUTER : Region::INNER))
+#define IS_SAME(r1, r2) \
+    (((r1) == Region::INNER && (r2) == Region::INNER) || ((r1) == Region::OUTER && (r2) == Region::OUTER))
+#define IS_DIFF(r1, r2) \
+    (((r1) == Region::INNER && (r2) == Region::OUTER) || ((r1) == Region::OUTER && (r2) == Region::INNER))
+#define UPDATE(r, nr)                                        \
+    do {                                                     \
+        if (IS_DIFF(r, nr)) {                                \
+            return false;                                    \
+        }                                                    \
+        if ((r) == Region::UNDET && (nr) != Region::UNDET) { \
+            (r) = (nr);                                      \
+            changed = true;                                  \
+        }                                                    \
+    } while (0)
 
 constexpr int adj[4][2] = {
-    { -1,  0 },
-    {  0,  1 },
-    {  1,  0 },
-    {  0, -1 },
+    {-1, 0},
+    {0, 1},
+    {1, 0},
+    {0, -1},
 };
 
-Slitherlink::Slitherlink(const std::vector<std::vector<int>> &grid) :
-    nr(grid.size()),
-    nc(grid[0].size()),
-    grid(nr + 2, std::vector<int>(nc + 2, EMPTY)) {
+Slitherlink::Slitherlink(const std::vector<std::vector<int>> &grid)
+    : nr(grid.size()), nc(grid[0].size()), grid(nr + 2, std::vector<Number>(nc + 2, Number::EMPTY)) {
     FOR_CELL {
-        this->grid[i][j] = grid[i - 1][j - 1];
+        this->grid[i][j] = static_cast<Number>(grid[i - 1][j - 1]);
     }
 }
 
-Slitherlink::Slitherlink(const std::vector<std::string> &grid) :
-    nr(grid.size()),
-    nc(grid[0].size()),
-    grid(nr + 2, std::vector<int>(nc + 2, EMPTY)) {
+Slitherlink::Slitherlink(const std::vector<std::string> &grid)
+    : nr(grid.size()), nc(grid[0].size()), grid(nr + 2, std::vector<Number>(nc + 2, Number::EMPTY)) {
     FOR_CELL {
-        this->grid[i][j] = isdigit(grid[i - 1][j - 1]) ? grid[i - 1][j - 1] - '0' : EMPTY;
+        this->grid[i][j] = isdigit(grid[i - 1][j - 1]) ? static_cast<Number>(grid[i - 1][j - 1] - '0') : Number::EMPTY;
     }
 }
 
 bool Slitherlink::solve(void) {
-    std::vector<std::vector<int>> region(this->nr + 2, std::vector<int>(this->nc + 2, UNDET));
+    std::vector<std::vector<Region>> region(this->nr + 2, std::vector<Region>(this->nc + 2, Region::UNDET));
     for (int i = 0; i < this->nr + 2; ++i) {
-        region[i][0] = region[i][this->nc + 1] = OUTER;
+        region[i][0] = region[i][this->nc + 1] = Region::OUTER;
     }
     for (int j = 1; j < this->nc + 1; ++j) {
-        region[0][j] = region[this->nr + 1][j] = OUTER;
+        region[0][j] = region[this->nr + 1][j] = Region::OUTER;
     }
 
     return this->solve_helper(region);
@@ -55,7 +67,7 @@ void Slitherlink::print_solution(void) {
 
     for (int i = 1; i < this->nr + 1; ++i) {
         for (int j = 1; j < this->nc + 1; ++j) {
-            buf[2 * i][4 * j] = this->grid[i][j] != -1 ? this->grid[i][j] + '0' : ' ';
+            buf[2 * i][4 * j] = this->grid[i][j] != Number::EMPTY ? static_cast<char>(this->grid[i][j]) + '0' : ' ';
         }
     }
 
@@ -107,8 +119,8 @@ void Slitherlink::print_solution(void) {
     }
 }
 
-bool Slitherlink::solve_helper(const std::vector<std::vector<int>> &region) {
-    std::vector<std::vector<int>> new_region = region;
+bool Slitherlink::solve_helper(const std::vector<std::vector<Region>> &region) {
+    std::vector<std::vector<Region>> new_region = region;
     if (!this->apply_heuristics(new_region)) {
         return false;
     }
@@ -118,26 +130,26 @@ bool Slitherlink::solve_helper(const std::vector<std::vector<int>> &region) {
     }
 
     /* Find the first undetermined region. */
-    auto [i0, j0] = this->find_region(new_region, UNDET);
+    auto [i0, j0] = this->find_region(new_region, Region::UNDET);
     /* No undetermined region. */
     if (i0 == (int)(-1) && j0 == (int)(-1)) {
         return false;
     }
 
     /* Try to fill the region with OUTER. */
-    new_region[i0][j0] = OUTER;
+    new_region[i0][j0] = Region::OUTER;
     if (this->solve_helper(new_region)) {
         return true;
     }
     /* Try to fill the region with INNER. */
-    new_region[i0][j0] = INNER;
+    new_region[i0][j0] = Region::INNER;
     if (this->solve_helper(new_region)) {
         return true;
     }
     return false;
 }
 
-bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
+bool Slitherlink::apply_heuristics(std::vector<std::vector<Region>> &region) {
     if (!this->is_available_partial_solution(region)) {
         return false;
     }
@@ -148,7 +160,7 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
 
         FOR_CELL {
             /* For 0, its adjacent cell must have the same region. */
-            if (this->grid[i][j] == 0) {
+            if (this->grid[i][j] == Number::ZERO) {
                 FOR_ADJ {
                     UPDATE(region[i][j], ADJ_REG);
                 }
@@ -157,7 +169,7 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
                 }
             }
 
-            if (this->grid[i][j] > 0 && region[i][j] != UNDET) {
+            if (this->grid[i][j] != Number::EMPTY && region[i][j] != Region::UNDET) {
                 /* For n > 0, if its region is determined and have n adjacent cells with the different region, then
                     other adjacent regions must have the same region. */
                 int cnt = 0;
@@ -166,13 +178,13 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
                         ++cnt;
                     }
                 }
-                if (cnt == this->grid[i][j]) {
+                if (cnt == static_cast<int>(this->grid[i][j])) {
                     FOR_ADJ {
-                        if (ADJ_REG == UNDET) {
+                        if (ADJ_REG == Region::UNDET) {
                             UPDATE(ADJ_REG, region[i][j]);
                         }
                     }
-                } else if (cnt > this->grid[i][j]) {
+                } else if (cnt > static_cast<int>(this->grid[i][j])) {
                     return false;
                 }
 
@@ -184,21 +196,21 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
                         ++cnt;
                     }
                 }
-                if (cnt == 4 - this->grid[i][j]) {
+                if (cnt == 4 - static_cast<int>(this->grid[i][j])) {
                     FOR_ADJ {
-                        if (ADJ_REG == UNDET) {
+                        if (ADJ_REG == Region::UNDET) {
                             UPDATE(ADJ_REG, INV(region[i][j]));
                         }
                     }
-                } else if (cnt > 4 - this->grid[i][j]) {
+                } else if (cnt > 4 - static_cast<int>(this->grid[i][j])) {
                     return false;
                 }
             }
 
             /* When two 3's are adjacent. */
-            if (this->grid[i][j] == 3 && this->grid[i][j + 1] == 3 &&
+            if (this->grid[i][j] == Number::THREE && this->grid[i][j + 1] == Number::THREE &&
                 (IS_SAME(region[i][j - 1], region[i][j + 1]) || IS_DIFF(region[i][j], region[i][j + 1]) ||
-                IS_SAME(region[i][j], region[i][j + 2]))) {
+                 IS_SAME(region[i][j], region[i][j + 2]))) {
                 UPDATE(region[i][j - 1], INV(region[i][j]));
                 UPDATE(region[i][j - 1], region[i][j + 1]);
                 UPDATE(region[i][j - 1], INV(region[i][j + 2]));
@@ -215,9 +227,9 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
                 UPDATE(region[i][j + 2], region[i][j]);
                 UPDATE(region[i][j + 2], INV(region[i][j + 1]));
             }
-            if (this->grid[i][j] == 3 && this->grid[i + 1][j] == 3 &&
+            if (this->grid[i][j] == Number::THREE && this->grid[i + 1][j] == Number::THREE &&
                 (IS_SAME(region[i - 1][j], region[i + 1][j]) || IS_DIFF(region[i][j], region[i + 1][j]) ||
-                IS_SAME(region[i][j], region[i + 2][j]))) {
+                 IS_SAME(region[i][j], region[i + 2][j]))) {
                 UPDATE(region[i - 1][j], INV(region[i][j]));
                 UPDATE(region[i - 1][j], region[i + 1][j]);
                 UPDATE(region[i - 1][j], INV(region[i + 2][j]));
@@ -236,7 +248,7 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
             }
 
             /* When two 3's are diagonally adjacent. */
-            if (this->grid[i][j] == 3 && this->grid[i + 1][j + 1] == 3) {
+            if (this->grid[i][j] == Number::THREE && this->grid[i + 1][j + 1] == Number::THREE) {
                 UPDATE(region[i][j], INV(region[i - 1][j]));
                 UPDATE(region[i][j], INV(region[i][j - 1]));
                 UPDATE(region[i - 1][j], INV(region[i][j]));
@@ -247,7 +259,7 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
                 UPDATE(region[i + 1][j + 2], INV(region[i + 1][j + 1]));
                 UPDATE(region[i + 2][j + 1], INV(region[i + 1][j + 1]));
             }
-            if (this->grid[i][j] == 3 && this->grid[i + 1][j - 1] == 3) {
+            if (this->grid[i][j] == Number::THREE && this->grid[i + 1][j - 1] == Number::THREE) {
                 UPDATE(region[i][j], INV(region[i - 1][j]));
                 UPDATE(region[i][j], INV(region[i][j + 1]));
                 UPDATE(region[i - 1][j], INV(region[i][j]));
@@ -263,7 +275,7 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
         FOR_CELL {
             /* When two diagnoally adjacent cells with the same region have common neighbor with the same region and
                 the other common neighbor is 3, it must have the different region. */
-            if (this->grid[i][j] == 3) {
+            if (this->grid[i][j] == Number::THREE) {
                 if (IS_SAME(region[i - 1][j], region[i - 1][j + 1]) &&
                     IS_SAME(region[i - 1][j + 1], region[i][j + 1])) {
                     UPDATE(region[i][j], INV(region[i - 1][j]));
@@ -284,7 +296,7 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
 
             /* When two diagnoally adjacent cells with the same region have common neighbor with the same region and
                 the other common neighbor is 1, it must have the same region. */
-            if (this->grid[i][j] == 1) {
+            if (this->grid[i][j] == Number::ONE) {
                 if (IS_SAME(region[i - 1][j], region[i - 1][j + 1]) &&
                     IS_SAME(region[i - 1][j + 1], region[i][j + 1])) {
                     UPDATE(region[i][j], region[i - 1][j]);
@@ -305,56 +317,56 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<int>> &region) {
         }
 
         /* If a 1 is in a corner, it must be in the outer region. */
-        if (this->grid[1][1] == 1) {
-            UPDATE(region[1][1], OUTER);
+        if (this->grid[1][1] == Number::ONE) {
+            UPDATE(region[1][1], Region::OUTER);
         }
-        if (this->grid[1][this->nc] == 1) {
-            UPDATE(region[1][this->nc], OUTER);
+        if (this->grid[1][this->nc] == Number::ONE) {
+            UPDATE(region[1][this->nc], Region::OUTER);
         }
-        if (this->grid[this->nr][1] == 1) {
-            UPDATE(region[this->nr][1], OUTER);
+        if (this->grid[this->nr][1] == Number::ONE) {
+            UPDATE(region[this->nr][1], Region::OUTER);
         }
-        if (this->grid[this->nr][this->nc] == 1) {
-            UPDATE(region[this->nr][this->nc], OUTER);
+        if (this->grid[this->nr][this->nc] == Number::ONE) {
+            UPDATE(region[this->nr][this->nc], Region::OUTER);
         }
 
         /* If a 2 is in a corner, its two adjacent cells must be in the inner region. */
-        if (this->grid[1][1] == 2) {
-            UPDATE(region[1][2], INNER);
-            UPDATE(region[2][1], INNER);
+        if (this->grid[1][1] == Number::TWO) {
+            UPDATE(region[1][2], Region::INNER);
+            UPDATE(region[2][1], Region::INNER);
         }
-        if (this->grid[1][this->nc] == 2) {
-            UPDATE(region[1][this->nc - 1], INNER);
-            UPDATE(region[2][this->nc], INNER);
+        if (this->grid[1][this->nc] == Number::TWO) {
+            UPDATE(region[1][this->nc - 1], Region::INNER);
+            UPDATE(region[2][this->nc], Region::INNER);
         }
-        if (this->grid[this->nr][1] == 2) {
-            UPDATE(region[this->nr - 1][1], INNER);
-            UPDATE(region[this->nr][2], INNER);
+        if (this->grid[this->nr][1] == Number::TWO) {
+            UPDATE(region[this->nr - 1][1], Region::INNER);
+            UPDATE(region[this->nr][2], Region::INNER);
         }
-        if (this->grid[this->nr][this->nc] == 2) {
-            UPDATE(region[this->nr][this->nc - 1], INNER);
-            UPDATE(region[this->nr - 1][this->nc], INNER);
+        if (this->grid[this->nr][this->nc] == Number::TWO) {
+            UPDATE(region[this->nr][this->nc - 1], Region::INNER);
+            UPDATE(region[this->nr - 1][this->nc], Region::INNER);
         }
 
         /* If a 3 is in a corner, it must be in the inner region. */
-        if (this->grid[1][1] == 3) {
-            UPDATE(region[1][1], INNER);
+        if (this->grid[1][1] == Number::THREE) {
+            UPDATE(region[1][1], Region::INNER);
         }
-        if (this->grid[1][this->nc] == 3) {
-            UPDATE(region[1][this->nc], INNER);
+        if (this->grid[1][this->nc] == Number::THREE) {
+            UPDATE(region[1][this->nc], Region::INNER);
         }
-        if (this->grid[this->nr][1] == 3) {
-            UPDATE(region[this->nr][1], INNER);
+        if (this->grid[this->nr][1] == Number::THREE) {
+            UPDATE(region[this->nr][1], Region::INNER);
         }
-        if (this->grid[this->nr][this->nc] == 3) {
-            UPDATE(region[this->nr][this->nc], INNER);
+        if (this->grid[this->nr][this->nc] == Number::THREE) {
+            UPDATE(region[this->nr][this->nc], Region::INNER);
         }
     }
 
     return true;
 }
 
-bool Slitherlink::is_available_partial_solution(std::vector<std::vector<int>> &region) {
+bool Slitherlink::is_available_partial_solution(std::vector<std::vector<Region>> &region) {
     /* No checkerboard pattern is allowed in 2x2 cells. */
     FOR_CELL {
         if (IS_DIFF(region[i][j], region[i][j + 1]) && IS_DIFF(region[i][j + 1], region[i + 1][j + 1]) &&
@@ -369,30 +381,30 @@ bool Slitherlink::is_available_partial_solution(std::vector<std::vector<int>> &r
     while (!q.empty()) {
         auto [i, j] = q.front();
         q.pop();
-        if (region[i][j] != UNDET && region[i][j] != OUTER) {
+        if (region[i][j] != Region::UNDET && region[i][j] != Region::OUTER) {
             continue;
         }
-        region[i][j] = region[i][j] == UNDET ? UNDET_BFS : OUTER_BFS;
+        region[i][j] = region[i][j] == Region::UNDET ? Region::UNDET_BFS : Region::OUTER_BFS;
         FOR_ADJ {
-            if (ADJ_REG == UNDET || ADJ_REG == OUTER) {
+            if (ADJ_REG == Region::UNDET || ADJ_REG == Region::OUTER) {
                 q.push(std::make_pair(i + adj[k][0], j + adj[k][1]));
             }
         }
     }
 
     /* Check if there is no OUTER's. If there is an UNDET, it must be INNER. Then set back all UNDET_BFS's and
-        OUTER_BFS's to UNDET and OUTER, respectively. */
+     * OUTER_BFS's to UNDET and OUTER, respectively. */
     bool no_hole = true;
     for (int i = 0; i < this->nr + 2; ++i) {
         for (int j = 0; j < this->nc + 2; ++j) {
-            if (region[i][j] == OUTER) {
+            if (region[i][j] == Region::OUTER) {
                 no_hole = false;
-            } else if (region[i][j] == UNDET) {
-                region[i][j] = INNER;
-            } else if (region[i][j] == UNDET_BFS) {
-                region[i][j] = UNDET;
-            } else if (region[i][j] == OUTER_BFS) {
-                region[i][j] = OUTER;
+            } else if (region[i][j] == Region::UNDET) {
+                region[i][j] = Region::INNER;
+            } else if (region[i][j] == Region::UNDET_BFS) {
+                region[i][j] = Region::UNDET;
+            } else if (region[i][j] == Region::OUTER_BFS) {
+                region[i][j] = Region::OUTER;
             }
         }
     }
@@ -403,17 +415,17 @@ bool Slitherlink::is_available_partial_solution(std::vector<std::vector<int>> &r
     return true;
 }
 
-bool Slitherlink::is_answer(std::vector<std::vector<int>> &region) {
-    /* Check if there is no UNDET. */
+bool Slitherlink::is_answer(std::vector<std::vector<Region>> &region) {
+    /* Check if there is no Region::UNDET. */
     FOR_CELL {
-        if (region[i][j] == UNDET) {
+        if (region[i][j] == Region::UNDET) {
             return false;
         }
     }
 
     /* Check if the region coincises well with the grid. */
     FOR_CELL {
-        if (this->grid[i][j] == EMPTY) {
+        if (this->grid[i][j] == Number::EMPTY) {
             continue;
         }
 
@@ -423,15 +435,15 @@ bool Slitherlink::is_answer(std::vector<std::vector<int>> &region) {
                 ++cnt;
             }
         }
-        if (cnt != this->grid[i][j]) {
+        if (cnt != static_cast<int>(this->grid[i][j])) {
             return false;
         }
     }
 
     /* Find the first inner region. */
-    auto [i2, j2] = this->find_region(region, INNER);
+    auto [i2, j2] = this->find_region(region, Region::INNER);
     /* No inner region. */
-    if (i2 == (int)(-1) && j2 == (int)(-1)) {
+    if (i2 == -1 && j2 == -1) {
         return true;
     }
 
@@ -441,12 +453,12 @@ bool Slitherlink::is_answer(std::vector<std::vector<int>> &region) {
     while (!q.empty()) {
         auto [i, j] = q.front();
         q.pop();
-        if (region[i][j] != INNER) {
+        if (region[i][j] != Region::INNER) {
             continue;
         }
-        region[i][j] = INNER_BFS;
+        region[i][j] = Region::INNER_BFS;
         FOR_ADJ {
-            if (ADJ_REG == INNER) {
+            if (ADJ_REG == Region::INNER) {
                 q.push(std::make_pair(i + adj[k][0], j + adj[k][1]));
             }
         }
@@ -455,29 +467,29 @@ bool Slitherlink::is_answer(std::vector<std::vector<int>> &region) {
     /* Check if there is no INNER's and set back all INNER_BFS's to INNER. */
     bool no_inner = true;
     FOR_CELL {
-        if (region[i][j] == INNER) {
+        if (region[i][j] == Region::INNER) {
             no_inner = false;
-        } else if (region[i][j] == INNER_BFS) {
-            region[i][j] = INNER;
+        } else if (region[i][j] == Region::INNER_BFS) {
+            region[i][j] = Region::INNER;
         }
     }
 
     return no_inner;
 }
 
-std::pair<int, int> Slitherlink::find_region(std::vector<std::vector<int>> &region, int val) {
+std::pair<int, int> Slitherlink::find_region(std::vector<std::vector<Region>> &region, Region val) {
     FOR_CELL {
         if (region[i][j] == val) {
             return std::make_pair(i, j);
         }
     }
-    return std::make_pair((int)(-1), (int)(-1));
+    return std::make_pair(-1, -1);
 }
 
-void Slitherlink::print_region(const std::vector<std::vector<int>> &region) {
+void Slitherlink::print_region(const std::vector<std::vector<Region>> &region) {
     for (int i = 1; i < this->nr + 1; ++i) {
         for (int j = 1; j < this->nc + 1; ++j) {
-            std::cout << region[i][j] << " ";
+            std::cout << static_cast<int>(region[i][j]) << " ";
         }
         std::cout << std::endl;
     }
