@@ -16,6 +16,8 @@ using namespace slink;
 
 #define ADJ_REG (region[i + adj[k][0]][j + adj[k][1]])
 
+#define ADJD_REG(IDX) (region[i + adjd[(IDX) % 8][0]][j + adjd[(IDX) % 8][1]])
+
 #define UPDATE(r, nr)                          \
     do {                                       \
         bool _updated;                         \
@@ -49,11 +51,17 @@ using namespace slink;
         }                                                                                                     \
     } while (0)
 
+/* Relative indices of adjacent cells in clockwise order. */
 static constexpr int adj[4][2] = {
     {-1, 0},
     {0, 1},
     {1, 0},
     {0, -1},
+};
+
+/* Relative indices of adjacent and diagonally adjacent cells in clockwise order. */
+static constexpr int adjd[8][2] = {
+    {-1, 0}, {-1, 1}, {0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1},
 };
 
 static Region inv_region(Region r);
@@ -226,6 +234,86 @@ bool Slitherlink::apply_heuristics(std::vector<std::vector<Region>> &region) {
                     }
                 } else if (cnt > 4 - static_cast<int>(this->grid[i][j])) {
                     return false;
+                }
+            }
+
+            /* Avoid checkerboard pattern. */
+            if (is_diff_region(region[i][j], region[i + 1][j]) && is_diff_region(region[i][j], region[i][j + 1])) {
+                UPDATE_DIFF(region[i][j], region[i + 1][j + 1]);
+            }
+            if (is_diff_region(region[i][j + 1], region[i][j]) &&
+                is_diff_region(region[i][j + 1], region[i + 1][j + 1])) {
+                UPDATE_DIFF(region[i][j + 1], region[i + 1][j]);
+            }
+            if (is_diff_region(region[i + 1][j], region[i][j]) &&
+                is_diff_region(region[i + 1][j], region[i + 1][j + 1])) {
+                UPDATE_DIFF(region[i + 1][j], region[i][j + 1]);
+            }
+            if (is_diff_region(region[i + 1][j + 1], region[i][j + 1]) &&
+                is_diff_region(region[i + 1][j + 1], region[i + 1][j])) {
+                UPDATE_DIFF(region[i + 1][j + 1], region[i][j]);
+            }
+
+            if (this->grid[i][j] == Number::ONE) {
+                for (int k = 0; k < 8; k += 2) {
+                    if ((is_diff_region(ADJD_REG(k), ADJD_REG(k + 1)) &&
+                         is_same_region(ADJD_REG(k + 1), ADJD_REG(k + 2))) ||
+                        (is_same_region(ADJD_REG(k), ADJD_REG(k + 1)) &&
+                         is_diff_region(ADJD_REG(k + 1), ADJD_REG(k + 2)))) {
+                        UPDATE_SAME(region[i][j], ADJD_REG(k + 4));
+                        UPDATE_SAME(region[i][j], ADJD_REG(k + 6));
+                    }
+
+                    if (is_diff_region(ADJD_REG(k), ADJD_REG(k + 1)) && is_same_region(region[i][j], ADJD_REG(k + 4)) &&
+                        is_same_region(region[i][j], ADJD_REG(k + 6))) {
+                        UPDATE_SAME(ADJD_REG(k + 1), ADJD_REG(k + 2));
+                    }
+
+                    if (is_diff_region(ADJD_REG(k + 1), ADJD_REG(k + 2)) &&
+                        is_same_region(region[i][j], ADJD_REG(k + 4)) &&
+                        is_same_region(region[i][j], ADJD_REG(k + 6))) {
+                        UPDATE_SAME(ADJD_REG(k), ADJD_REG(k + 1));
+                    }
+                }
+            }
+
+            if (this->grid[i][j] == Number::ONE && this->grid[i + 1][j + 1] == Number::ONE) {
+                if ((is_same_region(region[i][j], region[i + 1][j]) &&
+                     is_same_region(region[i][j], region[i][j + 1])) ||
+                    (is_same_region(region[i + 1][j + 1], region[i][j + 1]) &&
+                     is_same_region(region[i + 1][j + 1], region[i + 1][j]))) {
+                    UPDATE_SAME(region[i][j], region[i + 1][j + 1]);
+                }
+
+                if (is_same_region(region[i][j], region[i - 1][j]) && is_same_region(region[i][j], region[i][j - 1])) {
+                    UPDATE_SAME(region[i + 1][j + 1], region[i + 1][j + 2]);
+                    UPDATE_SAME(region[i + 1][j + 1], region[i + 2][j + 1]);
+                }
+
+                if (is_same_region(region[i + 1][j + 1], region[i + 1][j + 2]) &&
+                    is_same_region(region[i + 1][j + 1], region[i + 2][j + 1])) {
+                    UPDATE_SAME(region[i][j], region[i - 1][j]);
+                    UPDATE_SAME(region[i][j], region[i][j - 1]);
+                }
+            }
+
+            if (this->grid[i][j] == Number::ONE && this->grid[i + 1][j - 1] == Number::ONE) {
+                if ((is_same_region(region[i][j], region[i][j - 1]) &&
+                     is_same_region(region[i][j], region[i + 1][j])) ||
+                    (is_same_region(region[i + 1][j - 1], region[i + 1][j]) &&
+                     is_same_region(region[i + 1][j - 1], region[i][j - 1]))) {
+                    UPDATE_SAME(region[i][j], region[i + 1][j - 1]);
+                }
+
+                if (is_same_region(region[i][j], region[i - 1][j]) && is_same_region(region[i][j], region[i][j + 1])) {
+                    UPDATE_SAME(region[i + 1][j - 1], region[i + 1][j - 2]);
+                    UPDATE_SAME(region[i + 1][j - 1], region[i + 2][j - 1]);
+                }
+
+                if (is_same_region(region[i + 1][j - 1], region[i + 1][j - 2]) &&
+                    is_same_region(region[i + 1][j - 1], region[i + 2][j - 1])) {
+                    UPDATE_SAME(region[i][j], region[i - 1][j]);
+                    UPDATE_SAME(region[i][j], region[i][j + 1]);
                 }
             }
 
